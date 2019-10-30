@@ -7,6 +7,8 @@ from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
 
+from os import path
+
 
 class AESCipher:
     def __init__(self, key_s='hej'):
@@ -30,7 +32,11 @@ def json_message(message, error=None):
 
 
 def get_file(name):
-    with open('data/{}'.format(name), 'r') as fin:
+    p = 'data/{}'.format(name)
+    if not path.isfile(p):
+        with open(p, 'w') as fout:
+            pass
+    with open(p, 'r') as fin:
         return ''.join(fin)
 
 

@@ -43,8 +43,11 @@ class Session:
         pub = key.publickey()
         response = rq.post('{}/key?user={}'.format(self.url, self.user),
                            json={'pub': pub.exportKey('PEM').decode('utf-8')})
-        decrypter = PKCS1_OAEP.new(key)
-        return decrypter.decrypt(response.content).decode('utf-8')
+        if response.status_code == 200:
+            decrypter = PKCS1_OAEP.new(key)
+            return decrypter.decrypt(response.content).decode('utf-8')
+        else:
+            raise Exception(response.json()['error'])
 
     def init_session(self):
         if self.debug:
@@ -66,14 +69,28 @@ class Session:
                            encrypted,
                            headers=headers)
         message = response.json()
-        return message['error'] if message['message'] is None else message['message']
+        if response.status_code == 200:
+            return message['message']
+        elif response.status_code == 401:
+            self.key = None
+            self.aes = None
+            return self.send_text(name, text)
+        else:
+            raise Exception(message['error'])
 
     def get_text(self, name: str):
         if self.key is None or self.aes is None:
             self.init_session()
         response = rq.get('{}/file?user={}&name={}'.format(self.url, self.user, name))
-        decrypted = self.aes.decrypt(response.content)
-        if self.debug:
-            print('Encrypted data:', response.content)
-            print('Decrypted data:', decrypted)
-        return decrypted.decode('utf-8')
+        if response.status_code == 200:
+            decrypted = self.aes.decrypt(response.content)
+            if self.debug:
+                print('Encrypted data:', response.content)
+                print('Decrypted data:', decrypted)
+            return decrypted.decode('utf-8')
+        elif response.status_code == 401:
+            self.key = None
+            self.aes = None
+            return self.get_text(name)
+        else:
+            raise Exception(response.json()['error'])
