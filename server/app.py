@@ -32,7 +32,7 @@ def key():
         return json_message(None, "No such user."), 400
     pub = RSA.import_key(body['pub'])
     sessions[user] = {
-        'crypto': AESCipher(),
+        'crypto': AESCipher(generate_random_str()),
         'time': time.time()
     }
     encoder = PKCS1_OAEP.new(pub)

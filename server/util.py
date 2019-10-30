@@ -8,6 +8,8 @@ from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
 
 from os import path
+import random
+import string
 
 
 class AESCipher:
@@ -19,7 +21,7 @@ class AESCipher:
         iv = get_random_bytes(AES.block_size)
         self.cipher = AES.new(self.key, AES.MODE_CBC, iv)
         return b64encode(iv + self.cipher.encrypt(pad(data.encode('utf-8'),
-            AES.block_size)))
+                                                      AES.block_size)))
 
     def decrypt(self, data):
         raw = b64decode(data)
@@ -47,6 +49,12 @@ def store_file(name, data):
 
 def generate_AES():
     return get_random_bytes(AES.key_size[0])
+
+
+def generate_random_str(l=20):
+    letters = string.ascii_lowercase
+    return ''.join(random.choice(letters) for i in range(l))
+
 
 if __name__ == '__main__':
     aes = AESCipher()
