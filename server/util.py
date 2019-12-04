@@ -56,7 +56,9 @@ def generate_random_str(l=20):
     return ''.join(random.choice(letters) for i in range(l))
 
 
+def generate_code(n=8):
+    return ''.join(str(random.randint(0,9)) for _ in range(n))
+
+
 if __name__ == '__main__':
-    aes = AESCipher()
-    encrypted = aes.encrypt('some text')
-    print(aes.decrypt(encrypted).decode('utf-8'))
+    print(generate_code())

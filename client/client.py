@@ -9,6 +9,7 @@ from base64 import b64encode
 from hashlib import md5
 
 import requests as rq
+from requests.auth import HTTPBasicAuth as auth
 
 
 class AESCipher:
@@ -31,18 +32,32 @@ class AESCipher:
 
 class Session:
 
-    def __init__(self, url: str, user: str, debug=False):
+    def __init__(self, url: str, user: str, passwd: str, code=None, debug=False):
         self.user = user
+        self.passwd = passwd
         self.url = url
         self.key = None
         self.aes = None
         self.debug = debug
+        self.code = code
+
+    def set_code(self, code):
+        self.code = code
+
+    def login(self):
+        response = rq.get('{}/login'.format(self.url),
+                          auth=auth(self.user, self.passwd))
+        if response.status_code == 200:
+            return response.json()['message']
+        return f'Something went wrong: {response.text}, {response.status_code}'
 
     def get_key(self) -> str:
         key = RSA.generate(2048)
         pub = key.publickey()
-        response = rq.post('{}/key?user={}'.format(self.url, self.user),
-                           json={'pub': pub.exportKey('PEM').decode('utf-8')})
+        response = rq.post('{}/key'.format(self.url),
+                           json={'pub': pub.exportKey('PEM').decode('utf-8')},
+                           auth=auth(self.user, self.passwd),
+                           headers={'Session-Code': self.code})
         if response.status_code == 200:
             decrypter = PKCS1_OAEP.new(key)
             return decrypter.decrypt(response.content).decode('utf-8')
@@ -60,14 +75,16 @@ class Session:
     def send_text(self, name, text: str):
         if self.key is None or self.aes is None:
             self.init_session()
-        headers = {'Content-type': 'application/octet-stream'}
+        headers = {'Content-type': 'application/octet-stream',
+                   'Session-Code': self.code}
         encrypted = self.aes.encrypt(text)
         if self.debug:
             print('Raw data:', text)
             print('Encrypted data:', encrypted)
-        response = rq.post('{}/store?user={}&name={}'.format(self.url, self.user, name),
+        response = rq.post('{}/store?name={}'.format(self.url, name),
                            encrypted,
-                           headers=headers)
+                           headers=headers,
+                           auth=auth(self.user, self.passwd))
         message = response.json()
         if response.status_code == 200:
             return message['message']
@@ -81,7 +98,9 @@ class Session:
     def get_text(self, name: str):
         if self.key is None or self.aes is None:
             self.init_session()
-        response = rq.get('{}/file?user={}&name={}'.format(self.url, self.user, name))
+        response = rq.get('{}/file?name={}'.format(self.url, name),
+                          auth=auth(self.user, self.passwd),
+                          headers={'Session-Code': self.code})
         if response.status_code == 200:
             decrypted = self.aes.decrypt(response.content)
             if self.debug:
