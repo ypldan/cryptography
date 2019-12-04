@@ -1,5 +1,3 @@
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_OAEP
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
@@ -10,6 +8,32 @@ from hashlib import md5
 
 import requests as rq
 from requests.auth import HTTPBasicAuth as auth
+
+import binascii
+from random import sample
+from typing import *
+from sympy.crypto.crypto import gm_public_key, decipher_gm
+
+
+prime_numbers = [99991, 99989, 99971, 99961, 99929,
+                 99923, 99907, 99901, 99881, 99877,
+                 99871, 99859, 99839, 99833, 99829,
+                 99823, 99817, 99809, 99793, 99787,
+                 99767, 99761, 99733, 99721, 99719,
+                 99713, 99709, 99707, 99689, 99679]
+
+
+class GMC:
+    def __init__(self):
+        self.priv_key = tuple(sample(prime_numbers, 2))
+
+    def get_pub_key(self):
+        return gm_public_key(self.priv_key[0], self.priv_key[1])
+
+    def decode(self, encoded_message: List[int]):
+        message_code = decipher_gm(encoded_message, self.priv_key)
+        decoded_message = binascii.unhexlify(format(message_code, "x").encode("utf-8")).decode("utf-8")
+        return decoded_message
 
 
 class AESCipher:
@@ -52,15 +76,15 @@ class Session:
         return f'Something went wrong: {response.text}, {response.status_code}'
 
     def get_key(self) -> str:
-        key = RSA.generate(2048)
-        pub = key.publickey()
+        gmc = GMC()
+        a, N = gmc.get_pub_key()
         response = rq.post('{}/key'.format(self.url),
-                           json={'pub': pub.exportKey('PEM').decode('utf-8')},
+                           json={'a': a, 'N': N},
                            auth=auth(self.user, self.passwd),
                            headers={'Session-Code': self.code})
         if response.status_code == 200:
-            decrypter = PKCS1_OAEP.new(key)
-            return decrypter.decrypt(response.content).decode('utf-8')
+            decoded = response.json()['info']
+            return gmc.decode(decoded)
         else:
             raise Exception(response.json()['error'])
 

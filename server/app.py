@@ -2,8 +2,6 @@ from flask import Flask, request, send_file
 from flask_httpauth import HTTPBasicAuth
 from werkzeug.security import generate_password_hash, check_password_hash
 import io
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_OAEP
 from util import *
 import time
 import authbot as bot
@@ -44,21 +42,16 @@ def hello():
 def key():
     body = request.get_json()
     user = auth.username()
-    print(user)
     session_code = request.headers.get('Session-Code')
     if is_expired(user):
         return json_message(None, 'Expired session code. Please, relogin.'), 401
     elif session_code != sessions[user]['code']:
-        print(sessions[user])
-        print(session_code)
         return json_message(None, 'Wrong session code. Please, relogin.'), 402
-    pub = RSA.import_key(body['pub'])
+    a = body['a']
+    N = body['N']
     sessions[user]['crypto'] = AESCipher(generate_random_str())
     sessions[user]['time'] = time.time()
-    print(sessions[user])
-    encoder = PKCS1_OAEP.new(pub)
-    return send_file(io.BytesIO(encoder.encrypt(sessions[user]['crypto'].key_s.encode('utf-8'))),
-                                mimetype='application/octet-stream')
+    return send_key(GMS.encode(sessions[user]['crypto'].key_s, (a, N)))
 
 
 @app.route("/store", methods=['POST'])
@@ -71,8 +64,6 @@ def store():
     if is_expired(user):
         return json_message(None, 'Expired session code. Please, relogin.'), 401
     elif session_code != sessions[user]['code']:
-        print(sessions[user])
-        print(session_code)
         return json_message(None, 'Wrong session code. Please, relogin.'), 402
     data = request.data
     crypto = sessions[user]['crypto']
@@ -89,7 +80,6 @@ def store():
 @auth.login_required
 def file():
     user = auth.username()
-    print(user)
     name = request.args.get(NAME)
     session_code = request.headers.get('Session-Code')
     if is_expired(user):
@@ -115,7 +105,7 @@ def login():
         'code': code
     }
     bot.send_code(user, code)
-    return json_message('We send you code in telegram.')
+    return json_message('We sent you code in telegram.')
 
 
 if __name__ == "__main__":

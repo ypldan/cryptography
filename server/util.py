@@ -2,6 +2,9 @@ from flask import jsonify
 from base64 import b64decode
 from base64 import b64encode
 from hashlib import md5
+import binascii
+from typing import *
+from sympy.crypto.crypto import encipher_gm
 
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
@@ -33,6 +36,10 @@ def json_message(message, error=None):
     return jsonify(message=message, error=error)
 
 
+def send_key(key):
+    return jsonify(info=key)
+
+
 def get_file(name):
     p = 'data/{}'.format(name)
     if not path.isfile(p):
@@ -58,6 +65,13 @@ def generate_random_str(l=20):
 
 def generate_code(n=8):
     return ''.join(str(random.randint(0,9)) for _ in range(n))
+
+
+class GMS:
+    @staticmethod
+    def encode(message: str, pub_key: Tuple[int, int]):
+        message_code = int(binascii.hexlify(message.encode("utf-8")), 16)
+        return encipher_gm(message_code, pub_key)
 
 
 if __name__ == '__main__':
