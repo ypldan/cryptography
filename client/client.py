@@ -2,8 +2,7 @@ from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
 
-from base64 import b64decode
-from base64 import b64encode
+from base64 import b64decode, b64encode
 from hashlib import md5
 
 import requests as rq
@@ -13,6 +12,7 @@ import binascii
 from random import sample
 from typing import *
 from sympy.crypto.crypto import gm_public_key, decipher_gm
+import math
 
 
 prime_numbers = [99991, 99989, 99971, 99961, 99929,
@@ -54,6 +54,14 @@ class AESCipher:
         return unpad(self.cipher.decrypt(raw[AES.block_size:]), AES.block_size)
 
 
+def get_x(headers):
+    return float(b64decode(headers.get('x-value')).decode('utf-8'))
+
+
+def f(x):
+    return b64encode(('%.8f' % (math.exp(x) * math.cos(x))).encode('utf-8')).decode('utf-8')
+
+
 class Session:
 
     def __init__(self, url: str, user: str, passwd: str, code=None, debug=False):
@@ -64,14 +72,19 @@ class Session:
         self.aes = None
         self.debug = debug
         self.code = code
+        self.x = None
 
     def set_code(self, code):
         self.code = code
+
+    def get_code(self):
+        return b64encode(self.code.encode('utf-8')).decode('utf-8')
 
     def login(self):
         response = rq.get('{}/login'.format(self.url),
                           auth=auth(self.user, self.passwd))
         if response.status_code == 200:
+            self.x = get_x(response.headers)
             return response.json()['message']
         return f'Something went wrong: {response.text}, {response.status_code}'
 
@@ -81,8 +94,12 @@ class Session:
         response = rq.post('{}/key'.format(self.url),
                            json={'a': a, 'N': N},
                            auth=auth(self.user, self.passwd),
-                           headers={'Session-Code': self.code})
+                           headers={'Session-Code': self.get_code(),
+                                    'f-value': f(self.x)})
         if response.status_code == 200:
+            self.x = get_x(response.headers)
+            if self.debug:
+                print('Got x=', self.x)
             decoded = response.json()['info']
             return gmc.decode(decoded)
         else:
@@ -100,7 +117,8 @@ class Session:
         if self.key is None or self.aes is None:
             self.init_session()
         headers = {'Content-type': 'application/octet-stream',
-                   'Session-Code': self.code}
+                   'Session-Code': self.get_code(),
+                   'f-value': f(self.x)}
         encrypted = self.aes.encrypt(text)
         if self.debug:
             print('Raw data:', text)
@@ -111,6 +129,9 @@ class Session:
                            auth=auth(self.user, self.passwd))
         message = response.json()
         if response.status_code == 200:
+            self.x = get_x(response.headers)
+            if self.debug:
+                print('Got x=', self.x)
             return message['message']
         elif response.status_code == 401:
             self.key = None
@@ -124,10 +145,13 @@ class Session:
             self.init_session()
         response = rq.get('{}/file?name={}'.format(self.url, name),
                           auth=auth(self.user, self.passwd),
-                          headers={'Session-Code': self.code})
+                          headers={'Session-Code': self.get_code(),
+                                   'f-value': f(self.x)})
         if response.status_code == 200:
+            self.x = get_x(response.headers)
             decrypted = self.aes.decrypt(response.content)
             if self.debug:
+                print('Got x=', self.x)
                 print('Encrypted data:', response.content)
                 print('Decrypted data:', decrypted)
             return decrypted.decode('utf-8')

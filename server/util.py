@@ -13,6 +13,7 @@ from Crypto.Util.Padding import pad, unpad
 from os import path
 import random
 import string
+import json
 
 
 class AESCipher:
@@ -34,6 +35,18 @@ class AESCipher:
 
 def json_message(message, error=None):
     return jsonify(message=message, error=error)
+
+
+def normal_message(info):
+    return json.dumps({'message': info})
+
+
+def key_message(key):
+    return json.dumps({'info': key})
+
+
+def error_message(error):
+    return json.dumps({'error': error})
 
 
 def send_key(key):
