@@ -10,5 +10,5 @@ pyasn1==0.4.7
 pycryptodome==3.9.0
 requests==2.22.0
 rsa==4.0
-urllib3==1.25.6
+urllib3==1.25.8
 Werkzeug==0.16.0
